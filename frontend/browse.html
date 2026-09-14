@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Skills — Skill Exchange Platform</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<div class="container">
+  <div class="page-title">
+    <h1>Browse Skills</h1>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="searchInput" placeholder="Search skill name or description...">
+    <select id="typeFilter">
+      <option value="">All Types</option>
+      <option value="offer">Offering</option>
+      <option value="want">Wanted</option>
+    </select>
+    <button class="btn small" id="searchBtn">Search</button>
+  </div>
+
+  <div id="skillsGrid" class="grid"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <p id="emptyStateMessage">No skills found matching your search.</p>
+  </div>
+</div>
+
+<!-- Send Request Modal -->
+<div class="modal-overlay" id="requestModal">
+  <div class="modal">
+    <h3>Send a Request</h3>
+    <div class="error-msg" id="modalError"></div>
+    <div class="success-msg" id="modalSuccess"></div>
+    <p id="requestSkillLabel" style="color:#6b7280;font-size:14px;"></p>
+    <form id="requestForm">
+      <input type="hidden" id="requestSkillId">
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="requestMessage" placeholder="Introduce yourself and say why you're interested..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="cancelRequestBtn">Cancel</button>
+        <button type="submit" class="btn">Send Request</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+renderNavbar('browse');
+
+const skillsGrid = document.getElementById('skillsGrid');
+const emptyState = document.getElementById('emptyState');
+const emptyStateMessage = document.getElementById('emptyStateMessage');
+const currentUser = getUser();
+
+async function loadSkills() {
+  const search = document.getElementById('searchInput').value.trim();
+  const type = document.getElementById('typeFilter').value;
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (type) params.set('type', type);
+
+  try {
+    const skills = await apiFetch('/skills?' + params.toString());
+    const visible = currentUser ? skills.filter(s => s.user_id !== currentUser.id) : skills;
+    skillsGrid.innerHTML = '';
+    emptyState.style.display = visible.length === 0 ? 'block' : 'none';
+    if (visible.length === 0) {
+      emptyStateMessage.textContent = skills.length > 0 && currentUser
+        ? 'Only your own skills matched. Browse another member\'s skills to send a request.'
+        : 'No skills found matching your search.';
+    }
+
+    visible.forEach(skill => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <span class="badge ${skill.type}">${skill.type === 'offer' ? 'Offering' : 'Wanted'}</span>
+        <h3>${escapeHtml(skill.skill_name)}</h3>
+        <div class="meta">${escapeHtml(skill.category)} · ${escapeHtml(skill.level)}</div>
+        <p class="desc">${escapeHtml(skill.description || 'No description')}</p>
+        <div class="meta">By <a href="profile.html?id=${skill.user_id}" style="color:#4f46e5">${escapeHtml(skill.owner_name)}</a>${skill.owner_location ? ' · ' + escapeHtml(skill.owner_location) : ''}</div>
+        <div class="card-footer">
+          <span></span>
+          <button class="btn small request-btn">Request</button>
+        </div>
+      `;
+      card.querySelector('.request-btn').addEventListener('click', () => openRequestModal(skill));
+      skillsGrid.appendChild(card);
+    });
+  } catch (err) {
+    alert('Failed to load skills: ' + err.message);
+  }
+}
+
+const modal = document.getElementById('requestModal');
+const modalError = document.getElementById('modalError');
+const modalSuccess = document.getElementById('modalSuccess');
+
+function openRequestModal(skill) {
+  if (!currentUser) { window.location.href = 'login.html'; return; }
+  modalError.style.display = 'none';
+  modalSuccess.style.display = 'none';
+  document.getElementById('requestForm').reset();
+  document.getElementById('requestSkillId').value = skill.id;
+  document.getElementById('requestSkillLabel').textContent =
+    `Regarding "${skill.skill_name}" from ${skill.owner_name}`;
+  modal.classList.add('open');
+}
+document.getElementById('cancelRequestBtn').addEventListener('click', () => modal.classList.remove('open'));
+
+document.getElementById('requestForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  modalError.style.display = 'none';
+  modalSuccess.style.display = 'none';
+  const body = {
+    skill_id: document.getElementById('requestSkillId').value,
+    message: document.getElementById('requestMessage').value.trim(),
+  };
+  try {
+    await apiFetch('/requests', { method: 'POST', body: JSON.stringify(body) });
+    modalSuccess.textContent = 'Request sent!';
+    modalSuccess.style.display = 'block';
+    setTimeout(() => modal.classList.remove('open'), 1200);
+  } catch (err) {
+    modalError.textContent = err.message;
+    modalError.style.display = 'block';
+  }
+});
+
+document.getElementById('searchBtn').addEventListener('click', loadSkills);
+document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadSkills(); });
+document.getElementById('typeFilter').addEventListener('change', loadSkills);
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+loadSkills();
+</script>
+</body>
+</html>

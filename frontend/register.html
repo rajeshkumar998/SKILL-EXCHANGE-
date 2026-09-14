@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up — Skill Exchange Platform</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<div class="auth-card">
+  <h2>Create your account</h2>
+  <div class="error-msg" id="errorMsg"></div>
+  <form id="registerForm">
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="name" required>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="email" required>
+    </div>
+    <div class="form-group">
+      <label>Password (min 6 characters)</label>
+      <input type="password" id="password" required minlength="6">
+    </div>
+    <div class="form-group">
+      <label>Location (optional)</label>
+      <input type="text" id="location" placeholder="e.g. Chennai, India">
+    </div>
+    <div class="form-group">
+      <label>Short Bio (optional)</label>
+      <textarea id="bio" placeholder="Tell others about yourself..."></textarea>
+    </div>
+    <button type="submit" class="btn" style="width:100%">Sign Up</button>
+  </form>
+  <p class="auth-switch">Already have an account? <a href="login.html">Login</a></p>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+renderNavbar('register');
+
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorMsg = document.getElementById('errorMsg');
+  errorMsg.style.display = 'none';
+
+  const body = {
+    name: document.getElementById('name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value,
+    location: document.getElementById('location').value.trim(),
+    bio: document.getElementById('bio').value.trim(),
+  };
+
+  try {
+    const data = await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify(body) });
+    saveSession(data.token, data.user);
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>

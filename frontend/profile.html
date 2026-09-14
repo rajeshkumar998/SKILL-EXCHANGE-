@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — Skill Exchange Platform</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<div class="container">
+  <div class="profile-header">
+    <div class="avatar" id="avatar">?</div>
+    <div>
+      <h1 id="profileName" style="margin:0 0 4px 0;">Loading...</h1>
+      <div class="meta" id="profileMeta"></div>
+    </div>
+  </div>
+  <p id="profileBio" class="desc"></p>
+
+  <h2>Skills</h2>
+  <div id="skillsGrid" class="grid"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <p>This user hasn't listed any skills yet.</p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+renderNavbar('profile');
+
+const params = new URLSearchParams(window.location.search);
+const userId = params.get('id');
+
+async function loadProfile() {
+  if (!userId) { document.getElementById('profileName').textContent = 'No user specified'; return; }
+  try {
+    const user = await apiFetch(`/users/${userId}`);
+    document.getElementById('avatar').textContent = user.name.charAt(0).toUpperCase();
+    document.getElementById('profileName').textContent = user.name;
+    document.getElementById('profileMeta').textContent =
+      (user.location || 'Location not set') + ' · Joined ' + new Date(user.created_at).toLocaleDateString();
+    document.getElementById('profileBio').textContent = user.bio || 'No bio yet.';
+
+    const grid = document.getElementById('skillsGrid');
+    const emptyState = document.getElementById('emptyState');
+    grid.innerHTML = '';
+    emptyState.style.display = user.skills.length === 0 ? 'block' : 'none';
+
+    user.skills.forEach(skill => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <span class="badge ${skill.type}">${skill.type === 'offer' ? 'Offering' : 'Wanted'}</span>
+        <h3>${escapeHtml(skill.skill_name)}</h3>
+        <div class="meta">${escapeHtml(skill.category)} · ${escapeHtml(skill.level)}</div>
+        <p class="desc">${escapeHtml(skill.description || 'No description')}</p>
+      `;
+      grid.appendChild(card);
+    });
+  } catch (err) {
+    document.getElementById('profileName').textContent = 'User not found';
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+loadProfile();
+</script>
+</body>
+</html>

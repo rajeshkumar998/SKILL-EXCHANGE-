@@ -1,0 +1,5 @@
+backend/node_modules/
+backend/.env
+backend/skillexchange.db
+backend/skillexchange.db-shm
+backend/skillexchange.db-wal

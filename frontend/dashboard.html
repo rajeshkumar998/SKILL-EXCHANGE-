@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Skill Exchange Platform</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<div class="container">
+  <div class="page-title">
+    <h1>My Skills</h1>
+    <button class="btn" id="addSkillBtn">+ Add Skill</button>
+  </div>
+
+  <div id="skillsGrid" class="grid"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <p>You haven't added any skills yet. Click "+ Add Skill" to get started.</p>
+  </div>
+</div>
+
+<!-- Add/Edit Skill Modal -->
+<div class="modal-overlay" id="skillModal">
+  <div class="modal">
+    <h3 id="modalTitle">Add a Skill</h3>
+    <div class="error-msg" id="modalError"></div>
+    <form id="skillForm">
+      <input type="hidden" id="skillId">
+      <div class="form-group">
+        <label>Skill Name</label>
+        <input type="text" id="skillName" required placeholder="e.g. Guitar, Python, Cooking">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="skillType">
+          <option value="offer">I can teach this (Offer)</option>
+          <option value="want">I want to learn this (Want)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <input type="text" id="skillCategory" placeholder="e.g. Music, Programming, Cooking" value="General">
+      </div>
+      <div class="form-group">
+        <label>Level</label>
+        <select id="skillLevel">
+          <option>Beginner</option>
+          <option>Intermediate</option>
+          <option>Advanced</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="skillDescription" placeholder="Add details about this skill..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="cancelModalBtn">Cancel</button>
+        <button type="submit" class="btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireAuth();
+renderNavbar('dashboard');
+
+const skillsGrid = document.getElementById('skillsGrid');
+const emptyState = document.getElementById('emptyState');
+const modal = document.getElementById('skillModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalError = document.getElementById('modalError');
+const skillForm = document.getElementById('skillForm');
+
+function openModal(skill = null) {
+  modalError.style.display = 'none';
+  skillForm.reset();
+  if (skill) {
+    modalTitle.textContent = 'Edit Skill';
+    document.getElementById('skillId').value = skill.id;
+    document.getElementById('skillName').value = skill.skill_name;
+    document.getElementById('skillType').value = skill.type;
+    document.getElementById('skillCategory').value = skill.category;
+    document.getElementById('skillLevel').value = skill.level;
+    document.getElementById('skillDescription').value = skill.description;
+  } else {
+    modalTitle.textContent = 'Add a Skill';
+    document.getElementById('skillId').value = '';
+    document.getElementById('skillCategory').value = 'General';
+  }
+  modal.classList.add('open');
+}
+function closeModal() { modal.classList.remove('open'); }
+
+document.getElementById('addSkillBtn').addEventListener('click', () => openModal());
+document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+
+async function loadSkills() {
+  try {
+    const skills = await apiFetch('/skills/mine');
+    skillsGrid.innerHTML = '';
+    emptyState.style.display = skills.length === 0 ? 'block' : 'none';
+
+    skills.forEach(skill => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <span class="badge ${skill.type}">${skill.type === 'offer' ? 'Offering' : 'Wanted'}</span>
+        <h3>${escapeHtml(skill.skill_name)}</h3>
+        <div class="meta">${escapeHtml(skill.category)} · ${escapeHtml(skill.level)}</div>
+        <p class="desc">${escapeHtml(skill.description || 'No description')}</p>
+        <div class="card-footer">
+          <button class="btn small secondary edit-btn">Edit</button>
+          <button class="btn small danger delete-btn">Delete</button>
+        </div>
+      `;
+      card.querySelector('.edit-btn').addEventListener('click', () => openModal(skill));
+      card.querySelector('.delete-btn').addEventListener('click', () => deleteSkill(skill.id));
+      skillsGrid.appendChild(card);
+    });
+  } catch (err) {
+    alert('Failed to load skills: ' + err.message);
+  }
+}
+
+async function deleteSkill(id) {
+  if (!confirm('Delete this skill?')) return;
+  try {
+    await apiFetch(`/skills/${id}`, { method: 'DELETE' });
+    loadSkills();
+  } catch (err) {
+    alert('Failed to delete: ' + err.message);
+  }
+}
+
+skillForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  modalError.style.display = 'none';
+  const id = document.getElementById('skillId').value;
+  const body = {
+    skill_name: document.getElementById('skillName').value.trim(),
+    type: document.getElementById('skillType').value,
+    category: document.getElementById('skillCategory').value.trim() || 'General',
+    level: document.getElementById('skillLevel').value,
+    description: document.getElementById('skillDescription').value.trim(),
+  };
+  try {
+    if (id) {
+      await apiFetch(`/skills/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await apiFetch('/skills', { method: 'POST', body: JSON.stringify(body) });
+    }
+    closeModal();
+    loadSkills();
+  } catch (err) {
+    modalError.textContent = err.message;
+    modalError.style.display = 'block';
+  }
+});
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+loadSkills();
+</script>
+</body>
+</html>

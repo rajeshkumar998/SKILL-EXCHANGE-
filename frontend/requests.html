@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Requests — Skill Exchange Platform</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<div class="container">
+  <div class="page-title"><h1>Exchange Requests</h1></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="received">Received</button>
+    <button class="tab-btn" data-tab="sent">Sent</button>
+  </div>
+
+  <div id="requestsGrid" class="grid"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <p>No requests here yet.</p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireAuth();
+renderNavbar('requests');
+
+let activeTab = 'received';
+const grid = document.getElementById('requestsGrid');
+const emptyState = document.getElementById('emptyState');
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    loadRequests();
+  });
+});
+
+async function loadRequests() {
+  try {
+    const rows = await apiFetch(`/requests/${activeTab}`);
+    grid.innerHTML = '';
+    emptyState.style.display = rows.length === 0 ? 'block' : 'none';
+
+    rows.forEach(r => {
+      const otherName = activeTab === 'received' ? r.from_user_name : r.to_user_name;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <span class="badge ${r.status}">${r.status}</span>
+        <h3>${escapeHtml(r.skill_name)}</h3>
+        <div class="meta">${activeTab === 'received' ? 'From' : 'To'}: ${escapeHtml(otherName)}</div>
+        <p class="desc">${escapeHtml(r.message || 'No message')}</p>
+        <div class="card-footer">
+          <span class="meta">${new Date(r.created_at).toLocaleDateString()}</span>
+          <div id="actions-${r.id}"></div>
+        </div>
+      `;
+      if (activeTab === 'received' && r.status === 'pending') {
+        const actions = card.querySelector(`#actions-${r.id}`);
+        const acceptBtn = document.createElement('button');
+        acceptBtn.className = 'btn small';
+        acceptBtn.textContent = 'Accept';
+        acceptBtn.style.marginRight = '6px';
+        acceptBtn.addEventListener('click', () => updateStatus(r.id, 'accepted'));
+
+        const rejectBtn = document.createElement('button');
+        rejectBtn.className = 'btn small danger';
+        rejectBtn.textContent = 'Reject';
+        rejectBtn.addEventListener('click', () => updateStatus(r.id, 'rejected'));
+
+        actions.appendChild(acceptBtn);
+        actions.appendChild(rejectBtn);
+      }
+      grid.appendChild(card);
+    });
+  } catch (err) {
+    alert('Failed to load requests: ' + err.message);
+  }
+}
+
+async function updateStatus(id, status) {
+  try {
+    await apiFetch(`/requests/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    loadRequests();
+  } catch (err) {
+    alert('Failed: ' + err.message);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+loadRequests();
+</script>
+</body>
+</html>
